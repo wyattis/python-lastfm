@@ -11,19 +11,30 @@ class RequestWrapper:
     def __init__(self, api_key, api_secret):
         self.api_key = api_key
         self.api_secret = api_secret
+        
     
     def get_raw(self, url):
         """Just get response from the provided url. No edits to request are made"""
         response = r.get(url)
         return response.json()
     
+    def handle_retry(self, result):
+        """TODO: In the event of API calls exceeding the acceptable rate this function will handle retrying the call again."""
+        if 'error' in result and result['error'] is 29:
+            print('Should retry, but currently does not')
+        return result
+    
     def get(self, method=None, params={}):
         """Add the method, api_key and format to the request parameters"""
         params['method'] = method
         params['api_key'] = self.api_key
         params['format'] = 'json'
-        response = r.get(base_url, params=params)
-        return response.json()
+        try:
+            response = r.get(base_url, params=params)
+            result = response.json()
+        except Exception as e:
+            raise e
+        return self.handle_retry(result)
 
 class Facade:
     """Abstract Base Facade that is inherited from for all other Facades"""
@@ -79,8 +90,11 @@ class LastFM():
         self.artist = ArtistFacade(self.wrapper)
         self.track = TrackFacade(self.wrapper)
     
-    def next_page(self, response):
-        """Iterate through a response object with multiple pages."""
+    def page(self, response, increment):
+        """
+            Pull out the important variables from the response and change them 
+            to increment to the next page.
+        """
         if 'results' in response:
             r = response['results']
             total_results = int(r['opensearch:totalResults'])
@@ -90,7 +104,7 @@ class LastFM():
             search_terms = r['opensearch:Query']['searchTerms']
             
             # Check if we're going to exceed the number of results
-            if start_index + limit >= total_results:
+            if start_index + increment * limit >= total_results:
                 return None
             
             if 'artistmatches' in r:
@@ -106,8 +120,15 @@ class LastFM():
             p = {}
             p[query_type] = search_terms
             p['limit'] = limit
-            p['page'] = page + 1
+            p['page'] = page + increment
             return base.search(**p)
         else:
             return None
-            
+    
+    def next_page(self, response):
+        """Get the next page of results in a response object with multiple pages."""
+        return self.page(response, 1)
+    
+    def prev_page(self, response):
+        """Get the previous page of results in a response object with multiple pages"""
+        return self.page(response, -1)

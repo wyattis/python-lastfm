@@ -51,10 +51,10 @@ class TrackTestCase(unittest.TestCase):
         self.track_mbid = 'e0b110b4-fef4-473a-9c42-207d3c92cae0'
     def test_getInfo_by_mbid(self):
         res = self.fm.track.getInfo(mbid=self.track_mbid)
-        self.assertEqual(self.track_mbid, res['track']['mbid'])
+        self.assertEqual(self.track_mbid, res['track']['mbid'], "The track mbid's did not match.")
     def test_getInfo_by_name(self):
         res = self.fm.track.getInfo(artist=self.artist_name, track=self.track_name)
-        self.assertEqual(self.track_mbid, res['track']['mbid'])
+        self.assertEqual(self.track_mbid, res['track']['mbid'], "The track mbid's did not match.")
 
 class PaginateTestCase(unittest.TestCase):
     def setUp(self):
@@ -62,15 +62,30 @@ class PaginateTestCase(unittest.TestCase):
         self.query = 'winter'
     def page(self, results):
         new_results = self.fm.next_page(results)
-        self.assertTrue(results != None)
-        self.assertTrue(new_results != None)
-        self.assertTrue(results['results']['opensearch:startIndex'] != new_results['results']['opensearch:startIndex'])
+        self.assertTrue(results != None, "No results found for this query.")
+        self.assertTrue(new_results != None, "No results found for the second page of this query")
+        self.assertTrue(results['results']['opensearch:startIndex'] != new_results['results']['opensearch:startIndex'], "The page did not correctly increment.")
+        prev_results = self.fm.prev_page(new_results)
+        self.assertDictEqual(prev_results, results, "The previous results don't match the first results provided")
     def test_artist_page_results(self):
         self.page(self.fm.artist.search(artist=self.query))
     def test_album_page_results(self):
         self.page(self.fm.album.search(album=self.query))
     def test_track_page_results(self):
         self.page(self.fm.track.search(track=self.query))
+
+# class AuthErrorTestCase(unittest.TestCase):
+#     def setUp(self):
+#         import os
+#         self.LASTFM_API_KEY = os.getenv('LASTFM_API_KEY')
+#         os.environ['LASTFM_API_KEY'] = ''
+#         self.fm = LastFM()
+#     def test_api_key_failure(self):
+#         response = self.fm.artist.getInfo(artist='wintersleep')
+#         self.assertEqual(response)
+#     def tearDown(self):
+#         import os
+#         os.environ['LASTFM_API_KEY'] = self.LASTFM_API_KEY
 
 if __name__ == '__main__':
     unittest.main()
